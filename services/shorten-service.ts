@@ -50,4 +50,7 @@ class ShortenService extends Service {
   }
 }
 
-export { ShortenService };
+export {
+  type ShortenServiceProps,
+  ShortenService,
+};

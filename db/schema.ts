@@ -15,6 +15,7 @@ const linksTable = sqliteTable("Links", {
   groupId: text({ length: 8 }).references(() => groupsTable.id),
   target: text().notNull(),
   createdAt: integer({ mode: "timestamp_ms" }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+  updatedAt: integer({ mode: "timestamp_ms" }).default(sql`CURRENT_TIMESTAMP`).notNull(),
 });
 
 type LinksTable = InferSelectModel<typeof linksTable>;

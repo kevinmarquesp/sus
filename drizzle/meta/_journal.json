@@ -8,6 +8,13 @@
       "when": 1736540925801,
       "tag": "0000_plain_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1736565476263,
+      "tag": "0001_soft_veda",
+      "breakpoints": true
     }
   ]
 }

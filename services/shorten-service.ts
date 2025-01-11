@@ -32,11 +32,9 @@ class ShortenService extends Service {
     if (existing)
       return existing;
 
-    const id = nanoid(8);
-
     const [created] = await this.db
       .insert(linksTable)
-      .values({ id, target: this.props.target })
+      .values({ id: nanoid(8), target: this.props.target })
       .returning(publicLinksSchema);
 
     return created;

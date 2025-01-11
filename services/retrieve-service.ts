@@ -1,4 +1,4 @@
-import { linksTable } from "@/db/schema";
+import { linksTable, PublicLinksSchema, publicLinksSchema } from "@/db/schema";
 import { Service } from "@/entities/service";
 import { eq, sql } from "drizzle-orm";
 import { LibSQLDatabase } from "drizzle-orm/libsql";
@@ -22,19 +22,12 @@ class RetrieveService extends Service {
     this.props = retrieveServicePropsValidator.parse(props);
   }
 
-  public async run(): Promise<object> {
-    const publicSchema = {
-      id: linksTable.id,
-      groupId: linksTable.groupId,
-      target: linksTable.target,
-      createdAt: linksTable.createdAt,
-    };
-
+  public async run(): Promise<PublicLinksSchema> {
     const [entry] = await this.db
       .update(linksTable)
       .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
       .where(eq(linksTable.id, this.props.id))
-      .returning(publicSchema);
+      .returning(publicLinksSchema);
 
     assert.ok(entry, "Target ID not found");
 

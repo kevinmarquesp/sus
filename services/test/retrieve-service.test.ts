@@ -39,7 +39,7 @@ describe("RetrieveService", () => {
       expect(result).toHaveProperty("id", id);
       expect(result).toHaveProperty("groupId");
       expect(result).toHaveProperty("target", "https://example.com");
-      expect(result).toHaveProperty("createdAt");
+      expect(result).toHaveProperty("updatedAt");
 
       // Verify the updated timestamp
       const [dbEntry] = await db

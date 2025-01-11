@@ -1,4 +1,4 @@
-import { linksTable } from "@/db/schema";
+import { linksTable, PublicLinksSchema, publicLinksSchema } from "@/db/schema";
 import { Service } from "@/entities/service";
 import { eq, sql } from "drizzle-orm";
 import { LibSQLDatabase } from "drizzle-orm/libsql";
@@ -22,19 +22,12 @@ class ShortenService extends Service {
     this.props = shortenServicePropsValidator.parse(props);
   }
 
-  public async run(): Promise<object> {
-    const publicSchema = {
-      id: linksTable.id,
-      groupId: linksTable.groupId,
-      target: linksTable.target,
-      createdAt: linksTable.createdAt,
-    };
-
+  public async run(): Promise<PublicLinksSchema> {
     const [existing] = await this.db
       .update(linksTable)
       .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
       .where(eq(linksTable.target, this.props.target))
-      .returning(publicSchema);
+      .returning(publicLinksSchema);
 
     if (existing)
       return existing;
@@ -44,7 +37,7 @@ class ShortenService extends Service {
     const [created] = await this.db
       .insert(linksTable)
       .values({ id, target: this.props.target })
-      .returning(publicSchema);
+      .returning(publicLinksSchema);
 
     return created;
   }

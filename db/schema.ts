@@ -20,9 +20,20 @@ const linksTable = sqliteTable("Links", {
 
 type LinksTable = InferSelectModel<typeof linksTable>;
 
+const publicLinksSchema = {
+  id: linksTable.id,
+  groupId: linksTable.groupId,
+  target: linksTable.target,
+  updatedAt: linksTable.updatedAt,
+};
+
+type PublicLinksSchema = { [K in keyof typeof publicLinksSchema]: LinksTable[K] };
+
 export {
   groupsTable,
   type GroupsTable,
   linksTable,
   type LinksTable,
+  publicLinksSchema,
+  type PublicLinksSchema,
 };

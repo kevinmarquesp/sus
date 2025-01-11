@@ -10,6 +10,13 @@ const groupsTable = sqliteTable("Groups", {
 
 type GroupsTable = InferSelectModel<typeof groupsTable>;
 
+const publicGroupsSchema = {
+  id: groupsTable.id,
+  updatedAt: groupsTable.updatedAt,
+};
+
+type PublicGroupsSchema = { [K in keyof typeof publicGroupsSchema]: GroupsTable[K] };
+
 const linksTable = sqliteTable("Links", {
   id: text({ length: 8 }).unique().notNull(),
   groupId: text({ length: 8 }).references(() => groupsTable.id),
@@ -32,6 +39,8 @@ type PublicLinksSchema = { [K in keyof typeof publicLinksSchema]: LinksTable[K] 
 export {
   groupsTable,
   type GroupsTable,
+  publicGroupsSchema,
+  type PublicGroupsSchema,
   linksTable,
   type LinksTable,
   publicLinksSchema,

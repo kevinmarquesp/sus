@@ -31,6 +31,38 @@ class EditGroupService extends Service {
   }
 
   public async run(): Promise<PublicGroupsSchema & { children: PublicLinksSchema[] }> {
+    const { id, updatedAt, children } = await this.retrieveCurrentGroupData();
+
+    // Unlink the removed children and update the remaining ones.
+    const [_, updatedChildren] = await this.db.batch([
+      this.updateRemovedChildrenReferenceQuery(children, id),
+      this.updateUntouchedChildrenQuery(children, id),
+    ]);
+
+    // Compare the new children list to the old one to get which one as added.
+    const newChildren = this.props.children.filter((child) =>
+      !children.map(({ target }) => target).includes(child));
+
+    const reusedChildren = await this.retrieveReusedUngroupedLinks(newChildren, id);
+
+    // And now compare it to the reused ones, the remaining should be created.
+    const toCreateChildren = newChildren.filter((child) =>
+      !reusedChildren.map(({ target }) => target).includes(child));
+
+    const createdChildren = await this.insertNewChildrenQueries(toCreateChildren, id);
+
+    return {
+      id,
+      updatedAt,
+      children: [
+        ...updatedChildren,
+        ...reusedChildren,
+        ...createdChildren,
+      ],
+    };
+  }
+
+  private async retrieveCurrentGroupData(): Promise<PublicGroupsSchema & { children: PublicLinksSchema[] }> {
     const [[group], ...children] = await this.db.batch([
       this.selectGroupByIdAndPasswordQuery(this.props.id, this.props.password),
       this.selectGroupChildrenByGroupIdQuery(this.props.id),
@@ -38,85 +70,8 @@ class EditGroupService extends Service {
 
     assert.ok(group, "Group ID not found or incorrect password");
 
-    const oldGroup = { ...group, children: children.flat() };
-
-    // Unlink removed children.
-
-    const removedChildren = oldGroup.children.filter(({ target }) =>
-      !this.props.children.includes(target));
-
-    await this.db.batch([
-      this.db.run(sql`SELECT 'noop'`),
-      ...removedChildren.map(({ id }) =>
-        this.db
-          .update(linksTable)
-          .set({ groupId: null })
-          .where(eq(linksTable.id, id))),
-    ]);
-
-    // Update the untouched ones and sotre them.
-
-    const toUpdateChildren = oldGroup.children.filter(({ target }) =>
-      this.props.children.includes(target));
-
-    const [_, ...updatedChildren] = await this.db.batch([
-      this.db.run(sql`SELECT 'noop'`),
-      ...toUpdateChildren.map(({ id }) =>
-        this.db
-          .update(linksTable)
-          .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
-          .where(eq(linksTable.id, id))
-          .returning(publicLinksSchema)),
-    ]);
-
-    // Create the new links and store those results as well.
-
-    const newChildren = this.props.children.filter((c) =>
-      !oldGroup.children.map(({ target }) => target).includes(c));
-
-    // -- Find for ungrouped links to reuse.
-
-    const reusedChildren = await this.db
-      .update(linksTable)
-      .set({
-        groupId: this.props.id,
-        updatedAt: sql`CURRENT_TIMESTAMP`,
-      })
-      .where(and(isNull(linksTable.groupId), or(...newChildren.map((child) =>
-        eq(linksTable.target, child)))))
-      .returning(publicLinksSchema);
-
-    // -- Create a new entry if any can be found.
-
-    const toCreateChildren = newChildren.filter((child) =>
-      !reusedChildren.map(({ target }) => target).includes(child));
-
-    const [__, ...createdChildren] = await this.db.batch([
-      this.db.run(sql`SELECT 'noop'`),
-      ...toCreateChildren.map((child) =>
-        this.db
-          .insert(linksTable)
-          .values({
-            id: nanoid(8),
-            groupId: this.props.id,
-            target: child,
-          })
-          .returning(publicLinksSchema),
-      ),
-    ]);
-
-    // Compare the untouched and the created to fix the order.
-
-    const finalChildren = [
-      ...updatedChildren,
-      ...reusedChildren,
-      ...createdChildren,
-    ].flat();
-
-    return { ...group, children: finalChildren };
+    return { ...group, children: children.flat() };
   }
-
-  // Private methods to get the Drizzle queries to batch it all together.
 
   private selectGroupByIdAndPasswordQuery(id: string, password: string) {
     return this.db
@@ -131,6 +86,65 @@ class EditGroupService extends Service {
       .select(publicLinksSchema)
       .from(linksTable)
       .where(eq(linksTable.groupId, groupId));
+  }
+
+  private updateRemovedChildrenReferenceQuery(currentChildren: PublicLinksSchema[], groupId: string) {
+    const children = currentChildren.filter(({ target }) =>
+      !this.props.children.includes(target));
+
+    return this.db
+      .update(linksTable)
+      .set({ groupId: null })
+      .where(or(
+        ...children.map(({ id }) => and(
+          eq(linksTable.groupId, groupId),
+          eq(linksTable.id, id),
+        ))));
+  }
+
+  private updateUntouchedChildrenQuery(currentChildren: PublicLinksSchema[], groupId: string) {
+    const children = currentChildren.filter(({ target }) =>
+      this.props.children.includes(target));
+
+    return this.db
+      .update(linksTable)
+      .set({ groupId, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(or(
+        ...children.map(({ id }) =>
+          eq(linksTable.id, id)),
+      ))
+      .returning(publicLinksSchema);
+  }
+
+  private async retrieveReusedUngroupedLinks(children: string[], groupId: string) {
+    return await this.db
+      .update(linksTable)
+      .set({ groupId, updatedAt: sql`CURRENT_TIMESTAMP` })
+      .where(and(
+        isNull(linksTable.groupId),
+        or(...children.map((child) =>
+          eq(linksTable.target, child))),
+      ))
+      .returning(publicLinksSchema);
+  }
+
+  private async insertNewChildrenQueries(children: string[], groupId: string): Promise<PublicLinksSchema[]> {
+    const queries = children.map((child) =>
+      this.db
+        .insert(linksTable)
+        .values({
+          id: nanoid(8),
+          groupId,
+          target: child,
+        })
+        .returning(publicLinksSchema));
+
+    const [_, result] = await this.db.batch([
+      this.db.run(sql`SELECT 'noop'`),
+      ...queries,
+    ]);
+
+    return result.flat();
   }
 }
 

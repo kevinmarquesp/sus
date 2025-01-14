@@ -93,7 +93,7 @@ describe("EditGroupService", () => {
     const password = "securepassword";
 
     const initialLinks = [{
-      id: "link1",
+      id: "0086237b",
       target: "https://existing.com",
       groupId,
     }];

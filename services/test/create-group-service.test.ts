@@ -1,7 +1,7 @@
 import { mock } from "@/db/mock";
 import { CreateGroupService } from "../create-group-service";
 import { linksTable } from "@/db/schema";
-import { eq, or } from "drizzle-orm";
+import { eq, isNull, or } from "drizzle-orm";
 import { describe, it, expect } from "vitest";
 
 describe("CreateGroupService", () => {
@@ -120,6 +120,52 @@ describe("CreateGroupService", () => {
           children,
         }),
       ).toThrow();
+    });
+  });
+
+  it("creates new links if any can be reused", () => {
+    mock(async (db) => {
+      const children = [
+        "https://link1.com",
+        "https://link2.com",
+      ];
+
+      // Create the first group
+      const service1 = new CreateGroupService(db, {
+        password: "securepassword",
+        children,
+      });
+
+      const result1 = await service1.run();
+
+      // Verify the group and links were created
+      expect(result1).toHaveProperty("id");
+      expect(result1.children).toHaveLength(2);
+
+      // Create the second group with the same children
+      const service2 = new CreateGroupService(db, {
+        password: "anotherpassword",
+        children,
+      });
+
+      const result2 = await service2.run();
+
+      // Verify the second group was created with new links
+      expect(result2).toHaveProperty("id");
+      expect(result2.children).toHaveLength(2);
+      expect(result2.id).not.toBe(result1.id);
+
+      // Ensure the links have different group IDs
+      const links = await db
+        .select()
+        .from(linksTable)
+        .where(or(...children.map((child) =>
+          eq(linksTable.target, child))));
+
+      const groupIds = new Set(links.map((link) => link.groupId));
+
+      expect(links.length).toBe(4);
+      expect(groupIds.size).toBe(2); // Each group should have its own group ID
     });
   });
 });

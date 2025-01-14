@@ -1,6 +1,6 @@
 import { groupsTable, linksTable, publicGroupsSchema, PublicGroupsSchema, PublicLinksSchema, publicLinksSchema } from "@/db/schema";
 import { Service } from "@/entities/service";
-import { eq, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { LibSQLDatabase } from "drizzle-orm/libsql";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -34,11 +34,14 @@ class CreateGroupService extends Service {
     const existing = await this.db
       .select({ id: linksTable.id, target: linksTable.target })
       .from(linksTable)
-      .where(or(...this.props.children.map((child) =>
-        eq(linksTable.target, child))));
+      .where(and(
+        isNull(linksTable.groupId),
+        or(...this.props.children.map((child) =>
+          eq(linksTable.target, child))),
+      ));
 
-    const existingIds = existing.map((e) => e.id);
-    const existingTargets = existing.map((e) => e.target);
+    const existingIds = existing.map(({ id }) => id);
+    const existingTargets = existing.map(({ target }) => target);
     const nonexistingTargets = this.props.children.filter((c) => !existingTargets.includes(c));
 
     const [[group], ...children] = await this.db.batch([

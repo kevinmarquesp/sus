@@ -1,5 +1,6 @@
 import { groupsTable, linksTable, publicGroupsSchema, PublicGroupsSchema, PublicLinksSchema, publicLinksSchema } from "@/db/schema";
 import { Service } from "@/entities/service";
+import { hash } from "bcryptjs";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { LibSQLDatabase } from "drizzle-orm/libsql";
 import { nanoid } from "nanoid";
@@ -32,7 +33,10 @@ class CreateGroupService extends Service {
     const groupId = nanoid(8);
 
     const existing = await this.db
-      .select({ id: linksTable.id, target: linksTable.target })
+      .select({
+        id: linksTable.id,
+        target: linksTable.target,
+      })
       .from(linksTable)
       .where(and(
         isNull(linksTable.groupId),
@@ -42,10 +46,13 @@ class CreateGroupService extends Service {
 
     const existingIds = existing.map(({ id }) => id);
     const existingTargets = existing.map(({ target }) => target);
-    const nonexistingTargets = this.props.children.filter((c) => !existingTargets.includes(c));
+    const nonexistingTargets = this.props.children.filter((child) =>
+      !existingTargets.includes(child));
+
+    const password = await this.encriptPassword(this.props.password);
 
     const [[group], ...children] = await this.db.batch([
-      this.insertGroupQuery(groupId),
+      this.insertGroupQuery(groupId, password),
       ...this.updateExistingLinksQueries(existingIds, groupId),
       ...this.createNewLinksQueries(nonexistingTargets, groupId),
     ]);
@@ -53,15 +60,18 @@ class CreateGroupService extends Service {
     return { ...group, children: children.flat() };
   }
 
-  // Private methods to get the Drizzle queries to batch it all together.
-
-  private insertGroupQuery(id: string) {
+  private insertGroupQuery(id: string, password: string) {
     return this.db
       .insert(groupsTable)
-      .values({
-        id, password: this.props.password,
-      })
+      .values({ id, password })
       .returning(publicGroupsSchema);
+  }
+
+  private async encriptPassword(password: string) {
+    const SECRET = process.env.BCRYPTJS_SECRET || "secret";
+    const SALT = Number(process.env.BCRYPTJS_SALT || 12);
+
+    return await hash(password + SECRET, SALT);
   }
 
   private updateExistingLinksQueries(existingIds: string[], groupId: string) {

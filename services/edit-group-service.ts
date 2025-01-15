@@ -1,5 +1,6 @@
 import { groupsTable, linksTable, PublicGroupsSchema, publicGroupsSchema, PublicLinksSchema, publicLinksSchema } from "@/db/schema";
 import { Service } from "@/entities/service";
+import { compare } from "bcryptjs";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { LibSQLDatabase } from "drizzle-orm/libsql";
 import { nanoid } from "nanoid";
@@ -72,21 +73,28 @@ class EditGroupService extends Service {
 
   private async retrieveCurrentGroupData(): Promise<PublicGroupsSchema & { children: PublicLinksSchema[] }> {
     const [[group], ...children] = await this.db.batch([
-      this.selectGroupByIdAndPasswordQuery(this.props.id, this.props.password),
+      this.selectGroupByIdAndPasswordQuery(this.props.id),
       this.selectGroupChildrenByGroupIdQuery(this.props.id),
     ]);
 
-    assert.ok(group, "Group ID not found or incorrect password");
+    assert.ok(group, "Group ID not found");
+
+    const isCorrectPassword = await this.comparePasswords(group.password, this.props.password);
+
+    assert.ok(isCorrectPassword, "Incorrect password");
 
     return { ...group, children: children.flat() };
   }
 
-  private selectGroupByIdAndPasswordQuery(id: string, password: string) {
+  private selectGroupByIdAndPasswordQuery(id: string) {
     return this.db
       .update(groupsTable)
       .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
-      .where(and(eq(groupsTable.id, id), eq(groupsTable.password, password)))
-      .returning(publicGroupsSchema);
+      .where(eq(groupsTable.id, id))
+      .returning({
+        password: groupsTable.password,
+        ...publicGroupsSchema,
+      });
   }
 
   private isUpdatedListEqualsToNew(updatedChildren: PublicLinksSchema[]) {
@@ -95,6 +103,12 @@ class EditGroupService extends Service {
 
     return reusedPerUpdatedList.length === this.props.children.length &&
       reusedPerUpdatedList.every((value) => value);
+  }
+
+  private async comparePasswords(hashed: string, password: string) {
+    const SECRET = process.env.BCRYPTJS_SECRET || "secret";
+
+    return await compare(password + SECRET, hashed);
   }
 
   private selectGroupChildrenByGroupIdQuery(groupId: string) {

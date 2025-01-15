@@ -39,6 +39,14 @@ class EditGroupService extends Service {
       this.updateUntouchedChildrenQuery(children, id),
     ]);
 
+    // Just returns the updated list if it hasn't been changed at all.
+    if (this.isUpdatedListEqualsToNew(updatedChildren))
+      return {
+        id,
+        updatedAt,
+        children: updatedChildren,
+      };
+
     // Compare the new children list to the old one to get which one as added.
     const newChildren = this.props.children.filter((child) =>
       !children.map(({ target }) => target).includes(child));
@@ -79,6 +87,14 @@ class EditGroupService extends Service {
       .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
       .where(and(eq(groupsTable.id, id), eq(groupsTable.password, password)))
       .returning(publicGroupsSchema);
+  }
+
+  private isUpdatedListEqualsToNew(updatedChildren: PublicLinksSchema[]) {
+    const reusedPerUpdatedList = updatedChildren.map(({ target }) =>
+      this.props.children.includes(target));
+
+    return reusedPerUpdatedList.length === this.props.children.length &&
+      reusedPerUpdatedList.every((value) => value);
   }
 
   private selectGroupChildrenByGroupIdQuery(groupId: string) {

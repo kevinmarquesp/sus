@@ -17,14 +17,16 @@ export const metadata: Metadata = {
   description: "Simple URL shortner that doesn't track any click, just shortens the given URL",
 };
 
-const RootLayout = ({ children }: Readonly<{ children: React.ReactNode }>) => {
-  return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {children}
-      </body>
-    </html>
-  );
-};
+const RootLayout = ({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) => (
+  <html lang="en">
+    <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-900 text-white`}>
+      {children}
+    </body>
+  </html>
+);
 
 export default RootLayout;

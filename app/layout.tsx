@@ -17,13 +17,13 @@ export const metadata: Metadata = {
   description: "Simple URL shortner that doesn't track any click, just shortens the given URL",
 };
 
-const RootLayout = ({
+const RootLayout = async ({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) => (
-  <html lang="en">
-    <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-900 text-white`}>
+  <html lang="en" className="overflow-x-hidden">
+    <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
       {children}
     </body>
   </html>

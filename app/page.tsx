@@ -4,8 +4,6 @@ import { db } from "@/db/db";
 import { ShortenService } from "@/services/shorten-service";
 import { headers } from "next/headers";
 
-const origin = (await headers()).get("x-url") + "/" || "/";
-
 const shortenProcess = async (url: string) => {
   try {
     const service = new ShortenService(db, { target: url });
@@ -29,6 +27,7 @@ const Home = async ({
     cached?: string,
   }>,
 }) => {
+  const origin = (await headers()).get("x-url") + "/" || "/";
   const { url, cached } = await searchParams;
   const result = url ? await shortenProcess(url) : null;
 
